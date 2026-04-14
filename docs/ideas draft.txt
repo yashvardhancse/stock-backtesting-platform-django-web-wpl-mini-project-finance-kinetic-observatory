@@ -22,6 +22,8 @@ GitHub Repo references-
 tv scanner GitHub repo
 tauric research GitHub repo
 
+mini tradingview clone
+
 
 ml techniques
 fundamental

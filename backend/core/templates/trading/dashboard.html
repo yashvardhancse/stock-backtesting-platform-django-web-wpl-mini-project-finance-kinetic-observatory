@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Kinetic Observatory | Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-xl-8">
+    <section class="glass-card hero-card">
+      <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+        <div>
+          <div class="eyebrow">Quantitative terminal</div>
+          <h2 class="section-title">TradingView-inspired backtesting platform</h2>
+          <p class="section-copy mb-0">
+            Upload OHLCV CSV data, choose an indicator strategy, and render signal overlays, equity curves,
+            Monte Carlo outcomes, and paper trading snapshots in one terminal.
+          </p>
+        </div>
+        <div class="chip-cloud">
+          <span class="signal-chip signal-chip-success">Django</span>
+          <span class="signal-chip signal-chip-info">jQuery AJAX</span>
+          <span class="signal-chip signal-chip-warning">Chart.js</span>
+          <span class="signal-chip signal-chip-ghost">₹100k paper capital</span>
+        </div>
+      </div>
+      <div class="metric-grid mt-4">
+        <article class="metric-card">
+          <span class="metric-label">Total Profit</span>
+          <strong class="metric-value text-success" id="summaryProfit">₹{{ summary.total_profit|default:"0.0" }}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Trades</span>
+          <strong class="metric-value" id="summaryTrades">{{ summary.trade_count|default:"0" }}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Win Rate</span>
+          <strong class="metric-value" id="summaryWinRate">{{ summary.win_rate|default:"0.0" }}%</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Sharpe Ratio</span>
+          <strong class="metric-value" id="summarySharpe">{{ summary.sharpe_ratio|default:"0.0" }}</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm">Strategy panel</h3>
+          <p class="section-copy small mb-0">Select a dataset and configure an indicator-based strategy.</p>
+        </div>
+        <div class="dataset-picker">
+          <label class="form-label kinetic-label mb-1">Dataset</label>
+          <select id="backtestDatasetSelect" class="form-select kinetic-input">
+            <option value="">Use latest dataset</option>
+            {% for dataset in datasets %}
+              <option value="{{ dataset.id }}" {% if dataset.id == latest_dataset_id %}selected{% endif %}>{{ dataset.original_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <form id="backtestForm" class="row g-3 mt-1">
+        {% csrf_token %}
+        <input type="hidden" name="dataset_id" id="backtestDatasetId" value="{{ latest_dataset_id|default:'' }}">
+        {% for field in strategy_form %}
+          <div class="col-12 col-md-6">
+            <label class="form-label kinetic-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+              <div class="field-error">{{ field.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+          <button type="submit" class="btn btn-kinetic-primary">Run Backtest</button>
+          <span class="status-pill">MA crossover, RSI, VWAP, Bollinger, MACD</span>
+        </div>
+      </form>
+    </section>
+
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Price chart</h3>
+          <p class="section-copy small mb-0">Close price with overlays, buy/sell markers, and equity context.</p>
+        </div>
+        <span class="status-pill status-pill-quiet" id="chartStatus">Waiting for analysis</span>
+      </div>
+      <canvas id="priceChart" height="160"></canvas>
+      <div class="row g-3 mt-3">
+        <div class="col-12 col-md-4">
+          <div class="mini-chart-card">
+            <canvas id="rsiChart" height="220"></canvas>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="mini-chart-card">
+            <canvas id="macdChart" height="220"></canvas>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="mini-chart-card">
+            <canvas id="equityChart" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 mini-chart-card">
+        <canvas id="monteCarloChart" height="220"></canvas>
+      </div>
+    </section>
+
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Trade log</h3>
+          <p class="section-copy small mb-0">Completed trades from the selected strategy run.</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-dark kinetic-table align-middle" id="tradeLogTable">
+          <thead>
+            <tr>
+              <th>Entry</th>
+              <th>Exit</th>
+              <th>Side</th>
+              <th class="text-end">Entry</th>
+              <th class="text-end">Exit</th>
+              <th class="text-end">Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="6" class="text-center text-secondary py-4">Run a backtest to populate the log.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <section class="glass-card">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Upload dataset</h3>
+          <p class="section-copy small mb-0">CSV only, with Date, Open, High, Low, Close, and Volume columns.</p>
+        </div>
+      </div>
+      <form id="uploadForm" enctype="multipart/form-data" class="stacked-form">
+        {% csrf_token %}
+        {% for field in upload_form %}
+          <div class="mb-3">
+            <label class="form-label kinetic-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+              <div class="field-error">{{ field.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <div class="dropzone" id="csvDropzone">
+          <div class="dropzone-icon">CSV</div>
+          <div class="dropzone-title">Drag and drop OHLCV CSV</div>
+          <div class="dropzone-copy">Or choose a file using the input above.</div>
+        </div>
+        <button type="submit" class="btn btn-kinetic-primary w-100 mt-3">Process file</button>
+      </form>
+    </section>
+
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Recent results</h3>
+          <p class="section-copy small mb-0">Latest strategy runs stored in SQLite.</p>
+        </div>
+      </div>
+      <div class="result-list">
+        {% for result in recent_results %}
+          <article class="result-item">
+            <div class="result-item-top">
+              <strong>{{ result.strategy_name }}</strong>
+              <span>{{ result.created_at|date:"M d, H:i" }}</span>
+            </div>
+            <div class="result-item-meta">{{ result.dataset.original_name }} · {{ result.symbol }}</div>
+            <div class="result-item-bottom">
+              <span class="text-success">₹{{ result.profit }}</span>
+              <span>{{ result.trade_count }} trades</span>
+            </div>
+          </article>
+        {% empty %}
+          <div class="empty-state">No backtests yet. Upload data and run the engine.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Paper market pulse</h3>
+          <p class="section-copy small mb-0">The simulated environment starts with ₹100,000.</p>
+        </div>
+      </div>
+      <div class="pulse-grid">
+        <div class="pulse-item">
+          <span>Balance</span>
+          <strong>₹100,000</strong>
+        </div>
+        <div class="pulse-item">
+          <span>Position</span>
+          <strong>Flat</strong>
+        </div>
+        <div class="pulse-item">
+          <span>Mode</span>
+          <strong>Long-only</strong>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

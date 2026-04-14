@@ -1,0 +1,84 @@
+Perfect! ✅ All tests pass. Now here's how to **create a superuser** and access the admin:
+
+## Terminal Commands
+
+**1. Create a superuser (from backend/core directory):**
+```powershell
+python manage.py createsuperuser
+```
+
+You'll be prompted:
+```
+Username: admin
+Email: admin@example.com
+Password: (enter your password)
+Password (again): 
+Superuser created successfully.
+```
+
+**2. Run the development server:**
+```powershell
+python manage.py runserver
+```
+
+**3. Open the admin panel:**
+```
+http://127.0.0.1:8000/admin/
+# Login with superuser credentials you just created
+```
+
+---
+
+## What You Can See in Admin
+
+Once logged in, you'll see:
+
+### **1. Uploaded Datasets**
+- **File name** & **upload time**
+- **Row count** (how many OHLCV candles)
+- **Column snapshot** (list of column names from the file)
+- **View stored CSV/Excel file** in media/datasets/
+
+### **2. Backtest Results** 
+- **Strategy name, symbol, profit, trade count**
+- **Parameters** (JSON) — all the backtest settings you used
+- **Metrics** (JSON) — Sharpe, win rate, max drawdown, profit factor
+- **Payloads** (JSON) — price, indicators, signals, equity curve, Monte Carlo simulations
+- **Paper trading payload** — portfolio state
+
+### **3. Trades**
+- **Symbol, side (LONG), entry/exit dates & prices**
+- **Profit, profit %**
+- **Exit reason** (signal, window, etc.)
+- **Link to parent backtest**
+
+### **4. Portfolios**
+- **Initial balance, current balance, realized P&L**
+- **Positions** (JSON) — holdings breakdown
+- **Equity curve** (JSON) — running balance over time
+
+---
+
+## Data Format (JSON Storage)
+
+All strategy results are stored as **JSON** in the database so you can inspect them:
+
+```json
+{
+  "metrics": {
+    "total_return": 0.15,
+    "sharpe_ratio": 1.23,
+    "win_rate": 0.65,
+    "profit_factor": 2.1,
+    "max_drawdown": -0.08
+  },
+  "parameters": {
+    "strategy": "ma_crossover",
+    "ma_type": "sma",
+    "short_window": 10,
+    "long_window": 50
+  }
+}
+```
+
+You can view and edit all of these in the admin interface!

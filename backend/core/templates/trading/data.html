@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Kinetic Observatory | Data{% endblock %}
+{% block page_title %}Data{% endblock %}
+{% block content %}
+<div class="glass-card">
+  <div class="section-head flex-wrap">
+    <div>
+      <div class="eyebrow">Dataset browser</div>
+      <h2 class="section-title-sm mb-1">OHLCV table with jQuery sorting and filtering</h2>
+      <p class="section-copy small mb-0">The table can be filtered, sorted, and paginated via the JSON /data/ endpoint.</p>
+    </div>
+    <div class="data-toolbar">
+      <select id="dataDatasetSelect" class="form-select kinetic-input">
+        {% for dataset in datasets %}
+          <option value="{{ dataset.id }}" {% if dataset.id == latest_dataset_id %}selected{% endif %}>{{ dataset.original_name }}</option>
+        {% endfor %}
+      </select>
+      <input type="search" id="dataSearchInput" class="form-control kinetic-input" placeholder="Search date or price">
+      <select id="dataSortSelect" class="form-select kinetic-input">
+        <option value="Date">Date</option>
+        <option value="Open">Open</option>
+        <option value="High">High</option>
+        <option value="Low">Low</option>
+        <option value="Close">Close</option>
+        <option value="Volume">Volume</option>
+      </select>
+      <select id="dataSortDirSelect" class="form-select kinetic-input">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="table-responsive mt-4">
+    <table class="table table-dark kinetic-table align-middle" id="dataTable">
+      <thead>
+        <tr>
+          <th data-sort="Date">Date</th>
+          <th class="text-end" data-sort="Open">Open</th>
+          <th class="text-end" data-sort="High">High</th>
+          <th class="text-end" data-sort="Low">Low</th>
+          <th class="text-end" data-sort="Close">Close</th>
+          <th class="text-end" data-sort="Volume">Volume</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="6" class="text-center text-secondary py-4">Choose a dataset to load rows.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+    <div class="status-pill" id="dataMeta">No dataset loaded</div>
+    <div class="pagination-controls">
+      <button class="btn btn-kinetic-outline btn-sm" id="dataPrevPage" type="button">Prev</button>
+      <button class="btn btn-kinetic-outline btn-sm" id="dataNextPage" type="button">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12 col-lg-6">
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Filtering workflow</h3>
+          <p class="section-copy small mb-0">The frontend issues AJAX requests as the search and sort controls change.</p>
+        </div>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item">No page reload on dataset changes</div>
+        <div class="checklist-item">Case-insensitive search over rendered rows</div>
+        <div class="checklist-item">Sticky table header on scroll</div>
+      </div>
+    </section>
+  </div>
+  <div class="col-12 col-lg-6">
+    <section class="glass-card mt-4">
+      <div class="section-head">
+        <div>
+          <h3 class="section-title-sm mb-1">Dataset inventory</h3>
+          <p class="section-copy small mb-0">Recent uploads with row counts and timestamps.</p>
+        </div>
+      </div>
+      <div class="result-list">
+        {% for dataset in datasets %}
+          <article class="result-item">
+            <div class="result-item-top">
+              <strong>{{ dataset.original_name }}</strong>
+              <span>{{ dataset.uploaded_at|date:"M d, H:i" }}</span>
+            </div>
+            <div class="result-item-meta">{{ dataset.row_count }} rows</div>
+          </article>
+        {% empty %}
+          <div class="empty-state">No datasets uploaded yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
