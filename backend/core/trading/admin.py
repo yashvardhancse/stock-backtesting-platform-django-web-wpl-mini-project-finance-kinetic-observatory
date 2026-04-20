@@ -19,29 +19,10 @@ class BacktestResultAdmin(admin.ModelAdmin):
         "created_at",
         "parameters",
         "metrics",
-        "price_payload",
-        "indicator_payload",
-        "signal_payload",
-        "equity_curve",
-        "monte_carlo_payload",
-        "paper_trading_payload",
     ]
     fieldsets = (
         ("Strategy", {"fields": ("dataset", "symbol", "strategy_name", "parameters")}),
         ("Results", {"fields": ("profit", "trade_count", "metrics")}),
-        (
-            "Data Payloads",
-            {
-                "fields": (
-                    "price_payload",
-                    "indicator_payload",
-                    "signal_payload",
-                    "equity_curve",
-                    "monte_carlo_payload",
-                    "paper_trading_payload",
-                )
-            },
-        ),
         ("Metadata", {"fields": ("created_at",)}),
     )
 

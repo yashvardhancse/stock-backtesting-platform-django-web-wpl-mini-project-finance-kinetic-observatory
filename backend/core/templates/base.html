@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#060b18">
+  <meta name="theme-color" content="#0f172a">
   <title>{% block title %}Kinetic Observatory{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,9 +35,6 @@
       <a class="sidebar-link {% if page_slug == 'upload' %}active{% endif %}" href="{% url 'upload_page' %}">
         <span>Upload</span>
       </a>
-      <a class="sidebar-link {% if page_slug == 'data' %}active{% endif %}" href="{% url 'data_page' %}">
-        <span>Data</span>
-      </a>
       <a class="sidebar-link {% if page_slug == 'results' %}active{% endif %}" href="{% url 'results_page' %}">
         <span>Results</span>
       </a>
@@ -45,12 +42,8 @@
 
     <div class="sidebar-footer">
       <div class="sidebar-metric">
-        <span>Paper balance</span>
-        <strong>₹100,000</strong>
-      </div>
-      <div class="sidebar-metric">
         <span>Strategy set</span>
-        <strong>Multi-indicator</strong>
+        <strong>Single-strategy</strong>
       </div>
     </div>
   </aside>
@@ -62,11 +55,9 @@
         <h1 class="topbar-title">{% block page_title %}Kinetic Observatory{% endblock %}</h1>
       </div>
       <div class="topbar-actions">
-        <div class="topbar-search input-group">
-          <span class="input-group-text search-prefix">⌕</span>
-          <input type="search" class="form-control kinetic-input search-input" placeholder="Search data, trades, or symbols" id="globalSearchInput">
-        </div>
-        <a href="{% url 'dashboard' %}#backtestForm" class="btn btn-kinetic-outline" data-run-backtest-link>Run Backtest</a>
+        {% if page_slug == 'dashboard' %}
+          <a href="{% url 'dashboard' %}#strategyPanel" class="btn btn-kinetic-outline" data-run-backtest-link>Run Backtest</a>
+        {% endif %}
       </div>
     </header>
 
@@ -78,7 +69,6 @@
   <nav class="mobile-nav d-lg-none">
     <a href="{% url 'dashboard' %}" class="mobile-nav-link {% if page_slug == 'dashboard' %}active{% endif %}">Dashboard</a>
     <a href="{% url 'upload_page' %}" class="mobile-nav-link {% if page_slug == 'upload' %}active{% endif %}">Upload</a>
-    <a href="{% url 'data_page' %}" class="mobile-nav-link {% if page_slug == 'data' %}active{% endif %}">Data</a>
     <a href="{% url 'results_page' %}" class="mobile-nav-link {% if page_slug == 'results' %}active{% endif %}">Results</a>
   </nav>
 
@@ -91,23 +81,27 @@
 
   <div id="toastContainer" class="toast-stack position-fixed top-0 end-0 p-3"></div>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
     window.KINETIC = {
       endpoints: {
         upload: "{% url 'upload_dataset_api' %}",
-        data: "{% url 'data_api' %}",
-        backtest: "{% url 'backtest_api' %}",
-        results: "{% url 'results_api' %}"
+        runBacktest: "{% url 'run_backtest' %}",
+        results: "{% url 'results_api' %}",
+        downloadTrades: "{% url 'download_trades' %}"
+      },
+      pages: {
+        upload: "{% url 'upload_page' %}",
+        dashboard: "{% url 'dashboard' %}",
+        results: "{% url 'results_page' %}"
       },
       latestResultId: "{{ latest_result_id|default:'' }}",
       latestDatasetId: "{{ latest_dataset_id|default:'' }}",
       pageSlug: "{{ page_slug|default:'dashboard' }}"
     };
   </script>
-  <script src="{% static 'js/kinetic-observatory.js' %}"></script>
+  <script src="{% static 'js/kinetic-observatory.js' %}?v=20260420-01"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

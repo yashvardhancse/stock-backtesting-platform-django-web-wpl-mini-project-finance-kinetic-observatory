@@ -1,26 +1,35 @@
 from __future__ import annotations
 
 from io import BytesIO
+from tempfile import gettempdir
 
 import pandas as pd
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 
-from .forms import BacktestConfigForm
-from .services import BacktestConfig, load_clean_dataset, run_backtest, run_monte_carlo_simulation, validate_uploaded_csv
+from .forms import BacktestConfigForm, DatasetUploadForm
+from .services import BacktestConfig, load_clean_dataset, run_backtest, validate_uploaded_dataset
+
+
+def build_sample_xlsx(filename: str, frame: pd.DataFrame) -> SimpleUploadedFile:
+	buffer = BytesIO()
+	frame.to_excel(buffer, index=False)
+	return SimpleUploadedFile(
+		filename,
+		buffer.getvalue(),
+		content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	)
 
 
 class DatasetServiceTests(SimpleTestCase):
-	def test_validate_uploaded_csv_rejects_missing_columns(self):
-		csv_bytes = b"Date,Open,High,Low,Close\n2024-01-01,10,11,9,10\n"
-		uploaded_file = SimpleUploadedFile("sample.csv", csv_bytes, content_type="text/csv")
-
-		result = validate_uploaded_csv(uploaded_file)
+	def test_validate_uploaded_dataset_rejects_non_xlsx_extension(self):
+		uploaded_file = SimpleUploadedFile("sample.csv", b"Date,Open\n", content_type="text/csv")
+		result = validate_uploaded_dataset(uploaded_file)
 
 		self.assertFalse(result.is_valid)
-		self.assertTrue(any("Volume" in error for error in result.errors))
+		self.assertTrue(any(".xlsx" in error for error in result.errors))
 
-	def test_validate_uploaded_csv_accepts_excel_files(self):
+	def test_validate_uploaded_dataset_rejects_missing_columns(self):
 		frame = pd.DataFrame(
 			{
 				"Date": ["2024-01-01", "2024-01-02"],
@@ -28,24 +37,44 @@ class DatasetServiceTests(SimpleTestCase):
 				"High": [11, 12],
 				"Low": [9, 10],
 				"Close": [10, 11],
-				"Volume": [100, 200],
 			}
 		)
-		buffer = BytesIO()
-		frame.to_excel(buffer, index=False)
-		uploaded_file = SimpleUploadedFile(
-			"sample.xlsx",
-			buffer.getvalue(),
-			content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		)
+		uploaded_file = build_sample_xlsx("missing_volume.xlsx", frame)
 
-		result = validate_uploaded_csv(uploaded_file)
+		result = validate_uploaded_dataset(uploaded_file)
+
+		self.assertFalse(result.is_valid)
+		self.assertTrue(any("volume" in error for error in result.errors))
+
+	def test_validate_uploaded_dataset_accepts_excel_files(self):
+		frame = pd.DataFrame(
+			{
+				"timestamp": ["2024-01-01", "2024-01-02"],
+				"open": [10, 11],
+				"high": [11, 12],
+				"low": [9, 10],
+				"close": [10, 11],
+				"volume": [100, 200],
+			}
+		)
+		uploaded_file = build_sample_xlsx("sample.xlsx", frame)
+
+		result = validate_uploaded_dataset(uploaded_file)
 
 		self.assertTrue(result.is_valid)
 
 	def test_load_clean_dataset_sorts_and_coerces_data(self):
-		csv_bytes = b"Date,Open,High,Low,Close,Volume\n2024-01-03,12,13,11,12,300\n2024-01-01,10,11,9,10,100\n2024-01-02,11,12,10,11,200\n"
-		uploaded_file = SimpleUploadedFile("sorted.csv", csv_bytes, content_type="text/csv")
+		frame = pd.DataFrame(
+			{
+				"datetime": ["2024-01-03", "2024-01-01", "2024-01-02"],
+				"open": [12, 10, 11],
+				"high": [13, 11, 12],
+				"low": [11, 9, 10],
+				"close": [12, 10, 11],
+				"volume": [300, 100, 200],
+			}
+		)
+		uploaded_file = build_sample_xlsx("sorted.xlsx", frame)
 
 		frame = load_clean_dataset(uploaded_file)
 
@@ -58,61 +87,55 @@ class StrategyEngineTests(SimpleTestCase):
 	def _sample_frame(self):
 		return pd.DataFrame(
 			{
-				"Date": pd.date_range("2024-01-01", periods=9, freq="D"),
-				"Open": [10, 9, 8, 7, 8, 9, 12, 13, 14],
-				"High": [11, 10, 9, 8, 9, 10, 13, 14, 15],
-				"Low": [9, 8, 7, 6, 7, 8, 11, 12, 13],
-				"Close": [10, 9, 8, 7, 8, 9, 12, 13, 14],
-				"Volume": [100, 120, 140, 160, 180, 200, 220, 240, 260],
+				"Date": pd.date_range("2024-01-01", periods=14, freq="D"),
+				"Open": [100, 98, 96, 94, 95, 97, 99, 101, 100, 98, 96, 97, 99, 101],
+				"High": [101, 99, 97, 95, 96, 98, 100, 102, 101, 99, 97, 98, 100, 102],
+				"Low": [99, 97, 95, 93, 94, 96, 98, 100, 99, 97, 95, 96, 98, 100],
+				"Close": [100, 98, 96, 94, 95, 97, 99, 101, 100, 98, 96, 97, 99, 101],
+				"Volume": [100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360],
 			}
 		)
 
-	def test_ma_crossover_generates_trade_rows(self):
+	def test_moving_average_generates_trade_rows(self):
 		config = BacktestConfig(
-			strategy="ma_crossover",
-			ma_type="sma",
+			strategy="ma",
 			short_window=2,
-			long_window=3,
-			simulations=120,
+			long_window=4,
 			symbol="TEST",
 		)
 
 		result = run_backtest(self._sample_frame(), config)
 
-		self.assertGreaterEqual(result["metrics"]["trade_count"], 1)
-		self.assertTrue(result["trade_rows"])
-		self.assertIn("price_payload", result)
-		self.assertIn("monte_carlo_payload", result)
+		self.assertIn("total_profit", result)
+		self.assertIn("num_trades", result)
+		self.assertIn("trades", result)
+		self.assertGreaterEqual(result["num_trades"], 1)
 
-	def test_monte_carlo_distribution_has_expected_shape(self):
-		monte_carlo = run_monte_carlo_simulation(pd.Series([0.01, -0.02, 0.03, 0.015]), simulations=150)
+	def test_rsi_and_ema_strategies_return_consistent_payload_shape(self):
+		rsi_result = run_backtest(self._sample_frame(), BacktestConfig(strategy="rsi", rsi_period=5))
+		ema_result = run_backtest(self._sample_frame(), BacktestConfig(strategy="ema", ema_window=5))
 
-		self.assertEqual(len(monte_carlo["final_values"]), 150)
-		self.assertEqual(sum(monte_carlo["histogram"]["counts"]), 150)
-		self.assertIn("mean", monte_carlo)
-		self.assertIn("variance", monte_carlo)
+		for payload in (rsi_result, ema_result):
+			self.assertIn("total_profit", payload)
+			self.assertIn("num_trades", payload)
+			self.assertIn("trades", payload)
 
 
 class FormValidationTests(SimpleTestCase):
+	def test_dataset_upload_form_rejects_csv(self):
+		uploaded_file = SimpleUploadedFile("bad.csv", b"Date,Open\n", content_type="text/csv")
+		form = DatasetUploadForm(data={"label": "Bad"}, files={"dataset_file": uploaded_file})
+
+		self.assertFalse(form.is_valid())
+
 	def test_backtest_config_form_rejects_invalid_windows(self):
 		form = BacktestConfigForm(
 			data={
-				"strategy": "ma_crossover",
-				"ma_type": "sma",
+				"strategy": "ma",
 				"short_window": 20,
 				"long_window": 10,
 				"rsi_period": 14,
-				"rsi_oversold": 30,
-				"rsi_overbought": 70,
-				"bb_window": 20,
-				"bb_std_dev": 2.0,
-				"macd_fast": 12,
-				"macd_slow": 26,
-				"macd_signal": 9,
-				"initial_balance": 100000,
-				"allocation_fraction": 1.0,
-				"simulations": 150,
-				"symbol": "TEST",
+				"ema_window": 20,
 			}
 		)
 
@@ -122,62 +145,53 @@ class FormValidationTests(SimpleTestCase):
 
 class ApiIntegrationTests(TestCase):
 	def test_upload_backtest_and_results_flow(self):
-		csv_bytes = (
-			b"Date,Open,High,Low,Close,Volume\n"
-			b"2024-01-01,10,11,9,10,100\n"
-			b"2024-01-02,9,10,8,9,120\n"
-			b"2024-01-03,8,9,7,8,140\n"
-			b"2024-01-04,7,8,6,7,160\n"
-			b"2024-01-05,8,9,7,8,180\n"
-			b"2024-01-06,9,10,8,9,200\n"
-			b"2024-01-07,12,13,11,12,220\n"
-			b"2024-01-08,13,14,12,13,240\n"
-			b"2024-01-09,14,15,13,14,260\n"
-		)
-		uploaded_file = SimpleUploadedFile("sample.csv", csv_bytes, content_type="text/csv")
+		with self.settings(MEDIA_ROOT=gettempdir()):
+			dataset_frame = pd.DataFrame(
+				{
+					"timestamp": pd.date_range("2024-01-01", periods=14, freq="D"),
+					"open": [100, 98, 96, 94, 95, 97, 99, 101, 100, 98, 96, 97, 99, 101],
+					"high": [101, 99, 97, 95, 96, 98, 100, 102, 101, 99, 97, 98, 100, 102],
+					"low": [99, 97, 95, 93, 94, 96, 98, 100, 99, 97, 95, 96, 98, 100],
+					"close": [100, 98, 96, 94, 95, 97, 99, 101, 100, 98, 96, 97, 99, 101],
+					"volume": [100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360],
+				}
+			)
+			uploaded_file = build_sample_xlsx("sample.xlsx", dataset_frame)
 
-		upload_response = self.client.post(
-			"/upload/",
-			data={"csv_file": uploaded_file, "label": "Integration Dataset"},
-		)
+			upload_response = self.client.post(
+				"/upload/",
+				data={"dataset_file": uploaded_file, "label": "Integration Dataset"},
+			)
 
-		self.assertEqual(upload_response.status_code, 201)
-		upload_payload = upload_response.json()
-		dataset_id = upload_payload["dataset"]["id"]
+			self.assertEqual(upload_response.status_code, 201)
+			upload_payload = upload_response.json()
+			dataset_id = upload_payload["dataset"]["id"]
 
-		backtest_response = self.client.post(
-			"/backtest/",
-			data={
-				"dataset_id": dataset_id,
-				"strategy": "ma_crossover",
-				"ma_type": "sma",
-				"short_window": 2,
-				"long_window": 3,
-				"rsi_period": 14,
-				"rsi_oversold": 30,
-				"rsi_overbought": 70,
-				"bb_window": 3,
-				"bb_std_dev": 2.0,
-				"macd_fast": 12,
-				"macd_slow": 26,
-				"macd_signal": 9,
-				"initial_balance": 100000,
-				"allocation_fraction": 1.0,
-				"simulations": 120,
-				"symbol": "TEST",
-			},
-		)
+			backtest_response = self.client.post(
+				"/run-backtest/",
+				data={
+					"dataset_id": dataset_id,
+					"strategy": "ma",
+					"short_window": 2,
+					"long_window": 4,
+					"rsi_period": 14,
+					"ema_window": 20,
+				},
+			)
 
-		self.assertEqual(backtest_response.status_code, 201)
-		backtest_payload = backtest_response.json()
-		self.assertTrue(backtest_payload["success"])
-		self.assertGreaterEqual(backtest_payload["metrics"]["trade_count"], 1)
+			self.assertEqual(backtest_response.status_code, 200)
+			backtest_payload = backtest_response.json()
+			self.assertTrue(backtest_payload["success"])
+			self.assertIn("total_profit", backtest_payload)
+			self.assertIn("num_trades", backtest_payload)
+			self.assertIn("trades", backtest_payload)
 
-		results_response = self.client.get(f"/results/?result_id={backtest_payload['result_id']}")
-		self.assertEqual(results_response.status_code, 200)
-		results_payload = results_response.json()
-		self.assertEqual(results_payload["result"]["id"], backtest_payload["result_id"])
+			results_response = self.client.get(f"/results/?result_id={backtest_payload['result_id']}")
+			self.assertEqual(results_response.status_code, 200)
+			results_payload = results_response.json()
+			self.assertEqual(results_payload["result_id"], backtest_payload["result_id"])
 
-		data_response = self.client.get(f"/data/?dataset_id={dataset_id}")
-		self.assertEqual(data_response.status_code, 200)
-		self.assertGreaterEqual(len(data_response.json()["rows"]), 1)
+			download_response = self.client.get(f"/download-trades/?result_id={backtest_payload['result_id']}")
+			self.assertEqual(download_response.status_code, 200)
+			self.assertIn("text/csv", download_response["Content-Type"])
+			self.assertIn("Entry Time", download_response.content.decode("utf-8"))

@@ -1,5 +1,5 @@
 :root {
-  --bg: #060b18;
+  --bg: #0f172a;
   --bg-deep: #030712;
   --surface: #0c1326;
   --surface-2: #111a31;
@@ -34,9 +34,9 @@ body.kinetic-body {
   margin: 0;
   font-family: "Inter", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(80, 124, 255, 0.16), transparent 30%),
+    radial-gradient(circle at top left, rgba(80, 124, 255, 0.2), transparent 30%),
     radial-gradient(circle at 85% 20%, rgba(82, 241, 195, 0.12), transparent 22%),
-    linear-gradient(180deg, #050812 0%, #060b18 100%);
+    linear-gradient(180deg, #0f172a 0%, #0a1020 100%);
   color: var(--text);
   overflow-x: hidden;
 }
@@ -363,6 +363,10 @@ body.kinetic-body::before {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.metric-grid.metric-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .metric-card {
   padding: 18px;
 }
@@ -380,6 +384,11 @@ body.kinetic-body::before {
   font-family: "Manrope", sans-serif;
   font-size: clamp(1.6rem, 2vw, 2.25rem);
   font-weight: 800;
+}
+
+#resultCapital {
+  font-size: clamp(1.25rem, 1.6vw, 1.9rem);
+  line-height: 1.2;
 }
 
 .form-label.kinetic-label {
@@ -430,6 +439,10 @@ body.kinetic-body::before {
   color: #08111d;
   filter: brightness(1.04);
   transform: translateY(-1px);
+}
+
+.strategy-field {
+  display: none;
 }
 
 .btn-kinetic-outline {
@@ -484,6 +497,11 @@ canvas {
 
 .kinetic-table tbody tr:hover {
   background: rgba(133, 166, 255, 0.05);
+}
+
+.trade-table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
 }
 
 .table-dark {
