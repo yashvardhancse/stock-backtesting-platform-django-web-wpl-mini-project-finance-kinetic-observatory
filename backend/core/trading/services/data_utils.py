@@ -58,7 +58,7 @@ def validate_uploaded_dataset(file_obj) -> DatasetValidationResult:
     file_name = getattr(file_obj, "name", "").lower()
     errors: list[str] = []
 
-    if not file_name.endswith(".xlsx"):
+    if not file_name.endswith(".docx"):
         errors.append("Only Excel .xlsx uploads are supported.")
 
     try:

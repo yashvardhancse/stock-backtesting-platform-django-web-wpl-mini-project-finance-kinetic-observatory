@@ -10,6 +10,7 @@ Kinetic Observatory: Web-Based Stock Backtesting and Visualization Platform
 - Department: Computer Science and Engineering
 - Institution: MIT Manipal
 - Academic Year: 2025-2026
+- GitHub Repository: https://github.com/yashvardhancse/stock-backtesting-platform-django-web-wpl-mini-project-finance-kinetic-observatory/
 
 ## Student and Guide Details
 - Student 1: YashVardhan Gupta (Roll No. 55, Reg No. 230905442)
